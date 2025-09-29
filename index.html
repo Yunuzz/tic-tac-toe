@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Irys Glow Game</title>
+  <style>
+    /* ===== Reset & Base Styles ===== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top left, #1a1a1a, #000000);
+      color: #fff;
+      overflow: hidden;
+    }
+
+    /* ===== Background Text ===== */
+    .bg-irys {
+      position: absolute;
+      font-size: 20rem;
+      font-weight: bold;
+      color: #90ee90; 
+      opacity: 0.25;
+      text-shadow: 0 0 25px #90ee90, 0 0 60px #90ee90, 0 0 120px #90ee90;
+      z-index: 0;
+      transform: rotate(-15deg);
+      pointer-events: none;
+      animation: float 15s infinite alternate ease-in-out;
+    }
+
+    @keyframes float {
+      0%   { top: 10%; left: 10%; transform: rotate(-15deg) scale(1); }
+      50%  { top: 40%; left: 20%; transform: rotate(-10deg) scale(1.05); }
+      100% { top: 20%; left: 60%; transform: rotate(-20deg) scale(1); }
+    }
+
+    /* ===== Game Board ===== */
+    .game-container {
+      display: flex;
+      z-index: 1;
+      transition: all 0.3s;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(3, 100px);
+      gap: 10px;
+      background: rgba(255, 0, 255, 0.05);
+      padding: 10px;
+      border-radius: 15px;
+      box-shadow: 0 0 20px rgba(255, 0, 255, 0.4);
+    }
+
+    .cell {
+      width: 100px;
+      height: 100px;
+      background: #0a0a0a;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      color: #fff;
+      cursor: pointer;
+      transition: 0.3s;
+      box-shadow: 0 0 10px rgba(255, 0, 255, 0.2);
+    }
+
+    .cell:hover {
+      box-shadow: 0 0 20px rgba(255, 0, 255, 0.8);
+    }
+
+    /* ===== Control Panel (Top Right) ===== */
+    .control-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 20;
+      background: rgba(20, 20, 20, 0.9);
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+      min-width: 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .control-panel h2 {
+      text-align: center;
+      margin-bottom: 5px;
+    }
+
+    button, select {
+      padding: 10px;
+      font-size: 1rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    button {
+      background: linear-gradient(45deg, #ff00ff, #8000ff);
+      color: white;
+      box-shadow: 0 0 12px rgba(255, 0, 255, 0.5);
+    }
+
+    button:hover {
+      opacity: 0.85;
+      transform: scale(1.05);
+      box-shadow: 0 0 18px rgba(255, 0, 255, 0.9);
+    }
+
+    select {
+      background: #1e1e1e;
+      color: #ffffff;
+      border: 1px solid #90ee90;
+    }
+
+    select option {
+      background: #1e1e1e;
+      color: #ffffff;
+    }
+
+    /* ===== Win Glow Animation ===== */
+    @keyframes win-glow {
+      0% { box-shadow: 0 0 10px #00ff99; }
+      50% { box-shadow: 0 0 30px #00ff99; }
+      100% { box-shadow: 0 0 10px #00ff99; }
+    }
+
+    .win {
+      animation: win-glow 1s infinite;
+    }
+
+    /* ===== Scoreboard ===== */
+    .scoreboard {
+      font-size: 0.9rem;
+      text-align: center;
+      background: rgba(255,255,255,0.05);
+      padding: 5px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Background Glow Text -->
+  <div class="bg-irys">IRYS</div>
+
+  <!-- Game Board -->
+  <div class="game-container">
+    <div class="board" id="board"></div>
+  </div>
+
+  <!-- Floating Controls (Top Right) -->
+  <div class="control-panel">
+    <h2>🎮 Controls</h2>
+    <div class="scoreboard">
+      Wins: <span id="wins">0</span> | Losses: <span id="losses">0</span>
+    </div>
+    <button onclick="resetGame()">Reset</button>
+    <select id="modeSelect" onchange="changeMode()">
+      <option value="2p">2 Player Local</option>
+      <option value="ai">Vs AI</option>
+    </select>
+    <button onclick="joinDiscord()">Join Discord</button>
+    <button onclick="followX()">Follow on X</button>
+  </div>
+
+  <!-- Sound Effects -->
+  <audio id="clickSound" src="click.mp3"></audio>
+  <audio id="winSound" src="win.mp3"></audio>
+  <audio id="loseSound" src="lose.mp3"></audio>
+
+  <script>
+    const board = document.getElementById("board");
+    const modeSelect = document.getElementById("modeSelect");
+
+    let cells = [];
+    let currentPlayer = "X";
+    let mode = "2p";
+    let gameOver = false;
+    let wins = 0;
+    let losses = 0;
+
+    // Play sounds
+    function playClick() {
+      document.getElementById("clickSound").play();
+    }
+    function playWin() {
+      document.getElementById("winSound").play();
+    }
+    function playLose() {
+      document.getElementById("loseSound").play();
+    }
+
+    // Initialize board
+    function createBoard() {
+      board.innerHTML = "";
+      cells = [];
+      gameOver = false;
+      document.querySelector(".game-container").classList.remove("win");
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement("div");
+        cell.classList.add("cell");
+        cell.dataset.index = i;
+        cell.addEventListener("click", handleCellClick);
+        board.appendChild(cell);
+        cells.push(cell);
+      }
+    }
+
+    // Handle cell click
+    function handleCellClick(e) {
+      if (gameOver) return;
+      const cell = e.target;
+      if (cell.textContent !== "") return; // already filled
+
+      playClick();
+      cell.textContent = currentPlayer;
+
+      if (checkWin(currentPlayer)) {
+        setTimeout(() => alert(`${currentPlayer} Wins!`), 100);
+        document.querySelector(".game-container").classList.add("win");
+
+        if (mode === "ai" && currentPlayer === "X") {
+          wins++;
+          document.getElementById("wins").textContent = wins;
+          playWin();
+        } else if (mode === "ai" && currentPlayer === "O") {
+          losses++;
+          document.getElementById("losses").textContent = losses;
+          playLose();
+        }
+        gameOver = true;
+        return;
+      }
+
+      if (isDraw()) {
+        setTimeout(() => alert("It's a Draw!"), 100);
+        gameOver = true;
+        return;
+      }
+
+      if (mode === "2p") {
+        currentPlayer = currentPlayer === "X" ? "O" : "X";
+      } else if (mode === "ai") {
+        currentPlayer = "O"; 
+        aiMove();
+      }
+    }
+
+    // AI smarter move
+    function aiMove() {
+      if (gameOver) return;
+      let emptyCells = cells.filter(c => c.textContent === "");
+      if (emptyCells.length === 0) return;
+
+      let move = findBestMove();
+      playClick();
+      move.textContent = "O";
+
+      if (checkWin("O")) {
+        setTimeout(() => alert("AI Wins!"), 100);
+        document.querySelector(".game-container").classList.add("win");
+        losses++;
+        document.getElementById("losses").textContent = losses;
+        playLose();
+        gameOver = true;
+        return;
+      }
+
+      if (isDraw()) {
+        setTimeout(() => alert("It's a Draw!"), 100);
+        gameOver = true;
+        return;
+      }
+
+      currentPlayer = "X"; // back to human
+    }
+
+    function findBestMove() {
+      // Try to win
+      for (let cell of cells.filter(c => c.textContent === "")) {
+        cell.textContent = "O";
+        if (checkWin("O")) {
+          cell.textContent = "";
+          return cell;
+        }
+        cell.textContent = "";
+      }
+
+      // Block player
+      for (let cell of cells.filter(c => c.textContent === "")) {
+        cell.textContent = "X";
+        if (checkWin("X")) {
+          cell.textContent = "";
+          return cell;
+        }
+        cell.textContent = "";
+      }
+
+      // Take center
+      if (cells[4].textContent === "") return cells[4];
+
+      // Pick random
+      let emptyCells = cells.filter(c => c.textContent === "");
+      return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+    }
+
+    // Check win
+    function checkWin(player) {
+      const winPatterns = [
+        [0,1,2], [3,4,5], [6,7,8], // rows
+        [0,3,6], [1,4,7], [2,5,8], // cols
+        [0,4,8], [2,4,6]           // diagonals
+      ];
+      return winPatterns.some(pattern =>
+        pattern.every(i => cells[i].textContent === player)
+      );
+    }
+
+    // Check draw
+    function isDraw() {
+      return cells.every(c => c.textContent !== "");
+    }
+
+    // Reset board
+    function resetGame() {
+      currentPlayer = "X";
+      createBoard();
+    }
+
+    // Change mode
+    function changeMode() {
+      mode = modeSelect.value;
+      resetGame();
+    }
+
+    // Open Irys Discord
+    function joinDiscord() {
+      window.open("https://discord.gg/irysxyz", "_blank");
+    }
+
+    // Open Irys X (Twitter)
+    function followX() {
+      window.open("https://x.com/irys_xyz", "_blank");
+    }
+
+    // Start game
+    createBoard();
+  </script>
+</body>
+</html>
